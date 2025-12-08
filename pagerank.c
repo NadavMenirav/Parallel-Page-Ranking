@@ -23,7 +23,7 @@ void initArray(float* array, unsigned int size, long numberOfCores);
 void* threadInitArray(void* arg);
 
 // This function will be used to improve our current estimation of the rank of all the vertices
-void improve(float* array, unsigned int size);
+void improve(float* array, unsigned int size, long numberOfCores);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -41,7 +41,7 @@ void PageRank(const Graph *g, int n, float* rank) {
     initArray(rank, N, numberOfCores);
 
     for (int i = 0; i < n; i++) {
-        improve(rank, N);
+        improve(rank, N, numberOfCores);
     }
 
 
@@ -87,10 +87,15 @@ void* threadInitArray(void* arg) {
     return NULL;
 }
 
-void improve(float* array, unsigned int size) {
+void improve(float* array, const unsigned int size, const long numberOfCores) {
 
     // This array will be used to calculate the new values of the array before storing them in the array
-    float* temp
+    float* temp = malloc(sizeof(float) * size);
+
+    // How many vertices each thread works on
+    int chunk = (int)(size / numberOfCores);
+
+    free(temp);
 }
 
 
