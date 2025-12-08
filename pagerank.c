@@ -22,9 +22,14 @@ void initArray(float* array, unsigned int size, long numberOfCores);
 // The function each thread will receive in order to initialize the chunk he has
 void* threadInitArray(void* arg);
 
+// This function will be used to improve our current estimation of the rank of all the vertices
+void improve(float* array, unsigned int size);
+
 
 // This function will calculate the PageRank score of each node in the graph (see README)
 void PageRank(const Graph *g, int n, float* rank) {
+    if (!g) // CLion cried for not doing it
+        return;
 
     const unsigned int N = g->numVertices; // The number of web pages
     const long numberOfCores = sysconf(_SC_NPROCESSORS_ONLN); // The amount of cores in our computer
@@ -35,6 +40,9 @@ void PageRank(const Graph *g, int n, float* rank) {
      */
     initArray(rank, N, numberOfCores);
 
+    for (int i = 0; i < n; i++) {
+        improve(rank, N);
+    }
 
 
 }
@@ -42,8 +50,8 @@ void PageRank(const Graph *g, int n, float* rank) {
 void initArray(float* array, const unsigned int size, const long numberOfCores) {
 
     // We want to create a thread for each core we have, each thread will be given a different part of the array
-    pthread_t threads[numberOfCores];
-    InitArrayTask tasks[numberOfCores];
+    pthread_t* threads = malloc(sizeof(pthread_t) * numberOfCores);
+    InitArrayTask* tasks = malloc(sizeof(InitArrayTask) * numberOfCores);
 
     // The chunk each threads will get in the array
     const int chunk = (int)(size / numberOfCores);
@@ -61,6 +69,9 @@ void initArray(float* array, const unsigned int size, const long numberOfCores) 
         pthread_join(threads[i], NULL);
     }
 
+    free(threads);
+    free(tasks);
+
 }
 
 void* threadInitArray(void* arg) {
@@ -74,6 +85,12 @@ void* threadInitArray(void* arg) {
         array[i] = value;
     }
     return NULL;
+}
+
+void improve(float* array, unsigned int size) {
+
+    // This array will be used to calculate the new values of the array before storing them in the array
+    float* temp
 }
 
 
