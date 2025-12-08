@@ -10,12 +10,17 @@ typedef struct {
     float* array;
     unsigned int start;
     unsigned int end;
-} ZeroArrayTask;
+    float value;
+} InitArrayTask;
 
+// result will be returned to rank array
+void PageRank(const Graph *g, int n, float* rank);
 
-void PageRank(const Graph *g, int n, float* rank); // result will be returned to rank array
-void zeroArray(float* array, unsigned int size, long numberOfCores); // The function zeros the array in a parallel manner
-void* threadZeroArray(void* arg); // The function each thread will receive in order to zero the chunk he has
+// The function initializes the array in a parallel manner
+void initArray(float* array, unsigned int size, long numberOfCores);
+
+// The function each thread will receive in order to initialize the chunk he has
+void* threadInitArray(void* arg);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -24,15 +29,21 @@ void PageRank(const Graph *g, int n, float* rank) {
     const unsigned int N = g->numVertices; // The number of web pages
     const long numberOfCores = sysconf(_SC_NPROCESSORS_ONLN); // The amount of cores in our computer
 
-    // We start by zeroing the rank array in parallel
-    zeroArray(rank, N, numberOfCores);
+    /*
+     * We start by assigning 1/N as the rank for each vertex
+     * (We will use n iterations that will improve this first assignment)
+     */
+    initArray(rank, N, numberOfCores);
+
+
+
 }
 
-void zeroArray(float* array, const unsigned int size, const long numberOfCores) {
+void initArray(float* array, const unsigned int size, const long numberOfCores) {
 
     // We want to create a thread for each core we have, each thread will be given a different part of the array
     pthread_t threads[numberOfCores];
-    ZeroArrayTask tasks[numberOfCores];
+    InitArrayTask tasks[numberOfCores];
 
     // The chunk each threads will get in the array
     const int chunk = (int)(size / numberOfCores);
@@ -41,7 +52,8 @@ void zeroArray(float* array, const unsigned int size, const long numberOfCores) 
         tasks[i].array = array;
         tasks[i].start = i * chunk;
         tasks[i].end = (i == numberOfCores - 1)? size: (i + 1) * chunk;
-        pthread_create(&threads[i], NULL, &threadZeroArray, &tasks[i]);
+        tasks[i].value = 1.f / (float)size; // The initial value required for the array
+        pthread_create(&threads[i], NULL, &threadInitArray, &tasks[i]);
     }
 
     // Barrier
@@ -51,14 +63,15 @@ void zeroArray(float* array, const unsigned int size, const long numberOfCores) 
 
 }
 
-void* threadZeroArray(void* arg) {
-    const ZeroArrayTask* task = (ZeroArrayTask*)arg;
+void* threadInitArray(void* arg) {
+    const InitArrayTask* task = (InitArrayTask*)arg;
     const unsigned int start = task->start;
     const unsigned int end = task->end;
     float* array = task->array;
+    const float value = task->value;
 
     for (unsigned int i = start; i < end; i++) {
-        array[i] = 0;
+        array[i] = value;
     }
     return NULL;
 }
