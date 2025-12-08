@@ -4,4 +4,4 @@
 #endif //PAGERANK_H
 #include "graph.h"
 
-void PageRank(Graph *g, int n, float* rank); // result will be returned to rank array
+void PageRank(const Graph *g, int n, float* rank); // result will be returned to rank array
