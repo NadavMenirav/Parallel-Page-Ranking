@@ -1,3 +1,4 @@
+
 #ifndef GRAPH_H
 #define GRAPH_H
 
@@ -18,6 +19,8 @@ typedef struct node node;
 struct Graph {
     unsigned int numVertices;
     node **adjacencyLists;
+    int *numVisits; // Number of times a vertex has been visited
+    mutex *num_visits_mutexes; // Mutex for each vertex
 };
 
 typedef struct Graph Graph;

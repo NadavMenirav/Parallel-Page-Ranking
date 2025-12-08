@@ -1,67 +1,34 @@
-#ifndef GRAPH_H
-#define GRAPH_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
+#include "graph.h"
 
-typedef int vertex;
-typedef pthread_mutex_t mutex;
-
-struct node {
-    vertex v;
-    struct node *next;
-};
-
-typedef struct node node;
-
-struct Graph {
-    unsigned int numVertices;
-    node **adjacencyLists;
-};
-
-typedef struct Graph Graph;
-
-// Function to create a node
-node *createNode(vertex v) {
-    node *newNode = (node *)malloc(sizeof(node));
-    if (!newNode) {
-        printf("Memory allocation failed\n");
-        exit(1);
-    }
+node * createNode(vertex v) {
+    node *newNode = malloc(sizeof(node));
     newNode->v = v;
     newNode->next = NULL;
     return newNode;
 }
 
-// Function to create a graph with given vertices
-Graph *createGraph(int vertices) {
-    Graph *graph = (Graph *)malloc(sizeof(Graph));
-    if (!graph) {
-        printf("Memory allocation failed\n");
-        exit(1);
-    }
+void addEdge(Graph *graph, vertex source, vertex destination) {
+    if (source == destination) return; // ignore self loops
+    node *node = createNode(destination);
+    node->next = graph->adjacencyLists[source];
+    graph->adjacencyLists[source] = node;
+}
+
+Graph * createGraph(int vertices) {
+    Graph *graph = malloc(sizeof(Graph));
     graph->numVertices = vertices;
-    graph->adjacencyLists = (node **)malloc(vertices * sizeof(node *));
-    if (!graph->adjacencyLists) {
-        printf("Memory allocation failed\n");
-        free(graph);
-        exit(1);
-    }
+    graph->adjacencyLists = malloc(vertices * sizeof(node *));
+    graph->numVisits = malloc(vertices * sizeof(vertex));
+    graph->num_visits_mutexes = malloc(vertices * sizeof(mutex));
 
     for (int i = 0; i < vertices; i++) {
         graph->adjacencyLists[i] = NULL;
+        graph->numVisits[i] = 0;
+        pthread_mutex_init(&graph->num_visits_mutexes[i], NULL);
     }
 
     return graph;
 }
 
-// Function to add an edge to a directed graph
-void addEdge(Graph *graph, vertex source, vertex destination) {
-    // Add edge from source to destination
-    node *newNode = createNode(destination);
-    newNode->next = graph->adjacencyLists[source];
-    graph->adjacencyLists[source] = newNode;
-}
 
-#endif
