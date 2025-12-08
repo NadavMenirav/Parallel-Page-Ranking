@@ -7,4 +7,5 @@ add_executable(assignment_2 main.c
         graph.c
         graph.h
         thr_pool.c
-        thr_pool.h)
+        thr_pool.h
+        pagerank.c)
