@@ -14,8 +14,8 @@ typedef struct {
 } InitArrayTask;
 
 typedef struct {
+    size_t* array;
     size_t index;
-    float* array;
     node* outlinks;
 } CountOutlinks;
 
@@ -32,7 +32,10 @@ void* threadInitArray(void* arg);
 void improve(float* array, size_t size, long numberOfCores);
 
 // This function will fill an array with the outlinks for each vertex
-void getOutlinks(Graph* g, float* result, size_t size, long numberOfCores);
+void getOutlinks(const Graph* g, float* result, size_t size, long numberOfCores);
+
+// The function each thread will receive in order to count the number of outlinks each vertex has
+void* threadGetOutlinks(void* arg);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -112,7 +115,7 @@ void improve(float* array, const size_t size, const long numberOfCores) {
     free(temp);
 }
 
-void getOutlinks(Graph* g, float* result, size_t size, const long numberOfCores) {
+void getOutlinks(const Graph* g, size_t* result, size_t size, const long numberOfCores) {
 
     // We want to create a thread pool with the tasks of finding the outlinks for each vertex
     thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
@@ -125,10 +128,27 @@ void getOutlinks(Graph* g, float* result, size_t size, const long numberOfCores)
         outlinkTasks[i].array = result;
         outlinkTasks[i].index = i;
         outlinkTasks[i].outlinks = g->adjacencyLists[i];
-
     }
 
     free(outlinkTasks);
+}
+
+void* threadGetOutlinks(void* arg) {
+    CountOutlinks* outlinkTask = (CountOutlinks*)arg;
+    if (!outlinkTask) exit(-1);
+
+    // Each thread will scan the list in a sequential manner
+    const node* p = outlinkTask->outlinks; // The node that will scan the list
+    size_t count = 0; // The amount of outlinks the
+    while (p) {
+        count++;
+        p = p->next;
+    }
+
+    // The number of outlinks for the given vertex
+    outlinkTask->array[outlinkTask->index] = count;
+
+    return NULL;
 }
 
 
