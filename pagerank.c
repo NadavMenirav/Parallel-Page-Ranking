@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #ifndef D
-#define D 0.15 // The jumping factor. The probability the user will stop surfing and make a new search
+#define D 0.85 // The damping factor. The probability the user will continue to surf and click links
 #endif
 
 typedef struct {
@@ -128,8 +128,13 @@ void getOutlinks(const Graph* g, size_t* result, size_t size, const long numberO
         outlinkTasks[i].array = result;
         outlinkTasks[i].index = i;
         outlinkTasks[i].outlinks = g->adjacencyLists[i];
+
+        // Queue the task
+        thr_pool_queue(pool, &threadGetOutlinks, &outlinkTasks[i]);
     }
 
+    // We want to wait for all the tasks to complete before destroying the pool
+    thr_pool_wait(pool);
     free(outlinkTasks);
 }
 
