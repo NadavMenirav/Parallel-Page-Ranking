@@ -19,6 +19,14 @@ typedef struct {
     node* outlinks;
 } CountOutlinks;
 
+// Struct for the copy task
+typedef struct {
+    float* dest;       // The array we are writing TO (array)
+    const float* src;  // The array we are reading FROM (temp)
+    size_t start;
+    size_t end;
+} CopyArrayTask;
+
 typedef struct {
     float* temp; // The array the thread will write the new result to
     float* array; // The array of the previous PageRanks
@@ -48,6 +56,9 @@ void* threadGetOutlinks(void* arg);
 
 // The function each thread will receive in order to calculate the page rank
 void* threadCalculatePageRank(void* arg);
+
+// The function each thread will receive in order to copy one array to another
+void* threadCopyArray(void* arg);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -148,11 +159,39 @@ void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, c
         pageRank[i].outlinksCount = outlinks;
         pageRank[i].outlinks = g->adjacencyLists[i];
         pageRank[i].graph = g;
+        thr_pool_queue(pool, &threadCalculatePageRank, &pageRank[i]);
+    }
+
+    thr_pool_wait(pool);
+
+    // Now we want that the array will contain the result and not temp
+    pthread_t* threads = malloc(sizeof(pthread_t) * numberOfCores);
+    if (!threads) exit(-1);
+    CopyArrayTask* tasks = malloc(sizeof(CopyArrayTask) * numberOfCores);
+    if (!tasks) exit(-1);
+
+    // The chunk each threads will get in the array
+    const size_t chunk = size / numberOfCores;
+
+    for (long i = 0; i < numberOfCores; i++) {
+        tasks[i].dest = array;
+        tasks[i].src = temp;
+        tasks[i].start = i * chunk;
+        tasks[i].end = (i == numberOfCores - 1)? size: (i + 1) * chunk;
+        pthread_create(&threads[i], NULL, &threadCopyArray, &tasks[i]);
+    }
+
+    // Barrier
+    for (long i = 0; i < numberOfCores; i++) {
+        pthread_join(threads[i], NULL);
     }
 
 
     free(pageRank);
     free(temp);
+    free(threads);
+    free(tasks);
+
 }
 
 void getOutlinks(const Graph* g, size_t* result, const size_t size, const long numberOfCores) {
@@ -251,5 +290,14 @@ void* threadCalculatePageRank(void* arg) {
     }
 
 
+    return NULL;
+}
+
+// The thread function
+void* threadCopyArray(void* arg) {
+    const CopyArrayTask* task = (CopyArrayTask*)arg;
+    for (size_t i = task->start; i < task->end; i++) {
+        task->dest[i] = task->src[i];
+    }
     return NULL;
 }
