@@ -15,7 +15,7 @@ typedef struct {
 
 typedef struct {
     size_t* array;
-    size_t index;
+    size_t index; // Maybe change to range of indices
     node* outlinks;
 } CountOutlinks;
 
@@ -39,7 +39,7 @@ void* threadGetOutlinks(void* arg);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
-void PageRank(const Graph *g, int n, float* rank) {
+void PageRank(const Graph *g, const int n, float* rank) {
     if (!g) // CLion cried for not doing it
         return;
 
@@ -125,11 +125,11 @@ void getOutlinks(const Graph* g, size_t* result, size_t size, const long numberO
     // We want to create a thread pool with the tasks of finding the outlinks for each vertex
     thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
     if (!pool) exit(-1);
-    CountOutlinks* outlinkTasks = malloc(sizeof(CountOutlinks) * numberOfCores);
+    CountOutlinks* outlinkTasks = malloc(sizeof(CountOutlinks) * size);
     if (!outlinkTasks) exit(-1);
 
 
-    for (long i = 0; i < numberOfCores; i++) {
+    for (size_t i = 0; i < size; i++) {
         outlinkTasks[i].array = result;
         outlinkTasks[i].index = i;
         outlinkTasks[i].outlinks = g->adjacencyLists[i];
@@ -140,6 +140,8 @@ void getOutlinks(const Graph* g, size_t* result, size_t size, const long numberO
 
     // We want to wait for all the tasks to complete before destroying the pool
     thr_pool_wait(pool);
+    thr_pool_destroy(pool);
+
     free(outlinkTasks);
 }
 
