@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #ifndef D
-#define D 0.85 // The damping factor. The probability the user will continue to surf and click links
+#define D 0.85f // The damping factor. The probability the user will continue to surf and click links
 #endif
 
 typedef struct {
@@ -24,7 +24,8 @@ typedef struct {
     float* array; // The array of the previous PageRanks
     size_t* outlinksCount; // The number of outlinks for every node in the graph
     size_t index; // Which node it calculates
-    node* outlinks;
+    node* outlinks; // The adjacency list
+    size_t N; // The size of the graph
 } CalculatePageRank;
 
 // result will be returned to rank array
@@ -44,6 +45,9 @@ void getOutlinks(const Graph* g, size_t* result, size_t size, long numberOfCores
 
 // The function each thread will receive in order to count the number of outlinks each vertex has
 void* threadGetOutlinks(void* arg);
+
+// The function each thread will receive in order to calculate the page rank
+void* threadCalculatePageRank(void* arg);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -67,7 +71,7 @@ void PageRank(const Graph *g, const int n, float* rank) {
     // Now we call getOutlinks to fill the outlinks array
     getOutlinks(g, outlinks, N, numberOfCores);
 
-    // We create the thread pool that the "improve" function will queue tasks for calculating the PR to.
+    // We create the thread pool that the "improve" function will queue tasks for calculating the PR to
     thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
 
     for (int i = 0; i < n; i++) {
@@ -130,11 +134,21 @@ void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, c
     // This array will be used to calculate the new values before storing them in the array
     float* temp = malloc(sizeof(float) * size);
     if (!temp) exit(-1);
+    CalculatePageRank* pageRank = malloc(sizeof(CalculatePageRank) * numberOfCores);
+    if (!pageRank) exit(-1);
 
     // We want to enqueue the tasks. We have 'size' nodes in the graph, and we want to create a task for each one
+    for (size_t i = 0; i < size; i++) {
+        pageRank[i].temp = temp;
+        pageRank[i].array = array;
+        pageRank[i].index = i;
+        pageRank[i].outlinksCount = outlinks;
+        pageRank[i].outlinks = g->adjacencyLists[i];
+        pageRank[i].N = g->numVertices;
+    }
 
 
-
+    free(pageRank);
     free(temp);
 }
 
@@ -164,7 +178,7 @@ void getOutlinks(const Graph* g, size_t* result, const size_t size, const long n
 }
 
 void* threadGetOutlinks(void* arg) {
-    CountOutlinks* outlinkTask = (CountOutlinks*)arg;
+    CountOutlinks* outlinkTask = arg;
     if (!outlinkTask) exit(-1);
 
     // Each thread will scan the list in a sequential manner
@@ -177,6 +191,22 @@ void* threadGetOutlinks(void* arg) {
 
     // The number of outlinks for the given vertex
     outlinkTask->array[outlinkTask->index] = count;
+
+    return NULL;
+}
+
+void* threadCalculatePageRank(void* arg) {
+    CalculatePageRank* task = arg;
+    if (!task) exit(-1);
+
+    float result = (1 - D) / (float)task->N;
+
+    // For each of the neighbors u_i of v, we want to add to the result d * (pagerank(u_i)) / outlink(u_i)
+    const node* p = task->outlinks;
+
+    while (p) {
+        result += D * (task->array[p->v]) / (float)(task->outlinksCount[p->v]); // Double check this line
+    }
 
     return NULL;
 }
