@@ -231,5 +231,25 @@ void* threadCalculatePageRank(void* arg) {
         p = p->next;
     }
 
+
+    p = task->outlinks; // We want to iterate over all the vertices v points to
+
+    // If v has no neighbours, we need to add to all the vertices d * pagerank(v) / N
+    if (!p) {
+        for (size_t i = 0; i < task->graph->numVertices; i++ ) {
+
+            // Trying to capture the mutex
+            pthread_mutex_lock(&task->graph->num_visits_mutexes[i]);
+
+            // Updating the value
+            task->temp[i] += D * task->array[task->index] / (float)task->graph->numVertices;
+
+            // Releasing the mutex
+            pthread_mutex_unlock(&task->graph->num_visits_mutexes[i]);
+
+        }
+    }
+
+
     return NULL;
 }
