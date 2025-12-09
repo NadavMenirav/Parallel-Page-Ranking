@@ -32,7 +32,7 @@ void* threadInitArray(void* arg);
 void improve(float* array, size_t size, long numberOfCores);
 
 // This function will fill an array with the outlinks for each vertex
-void getOutlinks(const Graph* g, float* result, size_t size, long numberOfCores);
+void getOutlinks(const Graph* g, size_t* result, size_t size, long numberOfCores);
 
 // The function each thread will receive in order to count the number of outlinks each vertex has
 void* threadGetOutlinks(void* arg);
@@ -53,12 +53,17 @@ void PageRank(const Graph *g, int n, float* rank) {
     initArray(rank, N, numberOfCores);
 
     // We want to create an array that for each vertex store the number of OutLinks he has
+    size_t* outlinks = malloc(N * sizeof(size_t));
+    if (!outlinks) exit(-1);
+
+    // Now we call getOutlinks to fill the outlinks array
+    getOutlinks(g, outlinks, N, numberOfCores);
 
     for (int i = 0; i < n; i++) {
         improve(rank, N, numberOfCores);
     }
 
-
+    free(outlinks);
 }
 
 void initArray(float* array, const size_t size, const long numberOfCores) {
