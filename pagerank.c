@@ -19,6 +19,14 @@ typedef struct {
     node* outlinks;
 } CountOutlinks;
 
+typedef struct {
+    float* temp; // The array the thread will write the new result to
+    float* array; // The array of the previous PageRanks
+    size_t* outlinksCount; // The number of outlinks for every node in the graph
+    size_t index; // Which node it calculates
+    node* outlinks;
+} CalculatePageRank;
+
 // result will be returned to rank array
 void PageRank(const Graph *g, int n, float* rank);
 
@@ -29,7 +37,7 @@ void initArray(float* array, size_t size, long numberOfCores);
 void* threadInitArray(void* arg);
 
 // This function will be used to improve our current estimation of the rank of all the vertices
-void improve(float* array, size_t size, long numberOfCores);
+void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, size_t size, long numberOfCores);
 
 // This function will fill an array with the outlinks for each vertex
 void getOutlinks(const Graph* g, size_t* result, size_t size, long numberOfCores);
@@ -65,7 +73,7 @@ void PageRank(const Graph *g, const int n, float* rank) {
     for (int i = 0; i < n; i++) {
 
         // Enqueue the tasks
-        improve(rank, N, numberOfCores);
+        improve(g, pool, rank, outlinks, N, numberOfCores);
     }
 
     thr_pool_destroy(pool);
@@ -117,11 +125,13 @@ void* threadInitArray(void* arg) {
     return NULL;
 }
 
-void improve(float* array, const size_t size, const long numberOfCores) {
+void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, const size_t size, const long numberOfCores) {
 
     // This array will be used to calculate the new values before storing them in the array
     float* temp = malloc(sizeof(float) * size);
     if (!temp) exit(-1);
+
+    // We want to enqueue the tasks. We have 'size' nodes in the graph, and we want to create a task for each one
 
 
 
