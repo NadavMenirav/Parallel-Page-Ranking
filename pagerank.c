@@ -59,9 +59,17 @@ void PageRank(const Graph *g, const int n, float* rank) {
     // Now we call getOutlinks to fill the outlinks array
     getOutlinks(g, outlinks, N, numberOfCores);
 
+    // We create the thread pool that the "improve" function will queue tasks for calculating the PR to.
+    thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
+
     for (int i = 0; i < n; i++) {
+
+        // Enqueue the tasks
         improve(rank, N, numberOfCores);
     }
+
+    thr_pool_destroy(pool);
+
 
     free(outlinks);
 }
@@ -120,7 +128,7 @@ void improve(float* array, const size_t size, const long numberOfCores) {
     free(temp);
 }
 
-void getOutlinks(const Graph* g, size_t* result, size_t size, const long numberOfCores) {
+void getOutlinks(const Graph* g, size_t* result, const size_t size, const long numberOfCores) {
 
     // We want to create a thread pool with the tasks of finding the outlinks for each vertex
     thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
@@ -162,11 +170,3 @@ void* threadGetOutlinks(void* arg) {
 
     return NULL;
 }
-
-
-int main() {
-    PageRank(NULL, 0, NULL);
-    return 0;
-}
-
-
