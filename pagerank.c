@@ -17,13 +17,13 @@ typedef struct {
 void PageRank(const Graph *g, int n, float* rank);
 
 // The function initializes the array in a parallel manner
-void initArray(float* array, unsigned int size, long numberOfCores);
+void initArray(float* array, size_t size, long numberOfCores);
 
 // The function each thread will receive in order to initialize the chunk he has
 void* threadInitArray(void* arg);
 
 // This function will be used to improve our current estimation of the rank of all the vertices
-void improve(float* array, unsigned int size, long numberOfCores);
+void improve(float* array, size_t size, long numberOfCores);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -31,7 +31,7 @@ void PageRank(const Graph *g, int n, float* rank) {
     if (!g) // CLion cried for not doing it
         return;
 
-    const unsigned int N = g->numVertices; // The number of web pages
+    const size_t N = g->numVertices; // The number of web pages
     const long numberOfCores = sysconf(_SC_NPROCESSORS_ONLN); // The amount of cores in our computer
 
     /*
@@ -47,11 +47,13 @@ void PageRank(const Graph *g, int n, float* rank) {
 
 }
 
-void initArray(float* array, const unsigned int size, const long numberOfCores) {
+void initArray(float* array, const size_t size, const long numberOfCores) {
 
     // We want to create a thread for each core we have, each thread will be given a different part of the array
     pthread_t* threads = malloc(sizeof(pthread_t) * numberOfCores);
+    if (!threads) exit(-1);
     InitArrayTask* tasks = malloc(sizeof(InitArrayTask) * numberOfCores);
+    if (!tasks) exit(-1);
 
     // The chunk each threads will get in the array
     const int chunk = (int)(size / numberOfCores);
@@ -76,6 +78,7 @@ void initArray(float* array, const unsigned int size, const long numberOfCores) 
 
 void* threadInitArray(void* arg) {
     const InitArrayTask* task = (InitArrayTask*)arg;
+    if (!task) exit(-1);
     const unsigned int start = task->start;
     const unsigned int end = task->end;
     float* array = task->array;
@@ -87,13 +90,11 @@ void* threadInitArray(void* arg) {
     return NULL;
 }
 
-void improve(float* array, const unsigned int size, const long numberOfCores) {
+void improve(float* array, const size_t size, const long numberOfCores) {
 
-    // This array will be used to calculate the new values of the array before storing them in the array
+    // This array will be used to calculate the new values before storing them in the array
     float* temp = malloc(sizeof(float) * size);
 
-    // How many vertices each thread works on
-    int chunk = (int)(size / numberOfCores);
 
     free(temp);
 }
