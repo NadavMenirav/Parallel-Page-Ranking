@@ -8,10 +8,16 @@
 
 typedef struct {
     float* array;
-    unsigned int start;
-    unsigned int end;
+    size_t start;
+    size_t end;
     float value;
 } InitArrayTask;
+
+typedef struct {
+    size_t index;
+    float* array;
+    node* outlinks;
+} CountOutlinks;
 
 // result will be returned to rank array
 void PageRank(const Graph *g, int n, float* rank);
@@ -24,6 +30,9 @@ void* threadInitArray(void* arg);
 
 // This function will be used to improve our current estimation of the rank of all the vertices
 void improve(float* array, size_t size, long numberOfCores);
+
+// This function will fill an array with the outlinks for each vertex
+void getOutlinks(Graph* g, float* result, size_t size, long numberOfCores);
 
 
 // This function will calculate the PageRank score of each node in the graph (see README)
@@ -39,6 +48,8 @@ void PageRank(const Graph *g, int n, float* rank) {
      * (We will use n iterations that will improve this first assignment)
      */
     initArray(rank, N, numberOfCores);
+
+    // We want to create an array that for each vertex store the number of OutLinks he has
 
     for (int i = 0; i < n; i++) {
         improve(rank, N, numberOfCores);
@@ -56,9 +67,9 @@ void initArray(float* array, const size_t size, const long numberOfCores) {
     if (!tasks) exit(-1);
 
     // The chunk each threads will get in the array
-    const int chunk = (int)(size / numberOfCores);
+    const size_t chunk = size / numberOfCores;
 
-    for (int i = 0; i < numberOfCores; i++) {
+    for (long i = 0; i < numberOfCores; i++) {
         tasks[i].array = array;
         tasks[i].start = i * chunk;
         tasks[i].end = (i == numberOfCores - 1)? size: (i + 1) * chunk;
@@ -67,7 +78,7 @@ void initArray(float* array, const size_t size, const long numberOfCores) {
     }
 
     // Barrier
-    for (int i = 0; i < numberOfCores; i++) {
+    for (long i = 0; i < numberOfCores; i++) {
         pthread_join(threads[i], NULL);
     }
 
@@ -79,12 +90,12 @@ void initArray(float* array, const size_t size, const long numberOfCores) {
 void* threadInitArray(void* arg) {
     const InitArrayTask* task = (InitArrayTask*)arg;
     if (!task) exit(-1);
-    const unsigned int start = task->start;
-    const unsigned int end = task->end;
+    const size_t start = task->start;
+    const size_t end = task->end;
     float* array = task->array;
     const float value = task->value;
 
-    for (unsigned int i = start; i < end; i++) {
+    for (size_t i = start; i < end; i++) {
         array[i] = value;
     }
     return NULL;
@@ -94,9 +105,30 @@ void improve(float* array, const size_t size, const long numberOfCores) {
 
     // This array will be used to calculate the new values before storing them in the array
     float* temp = malloc(sizeof(float) * size);
+    if (!temp) exit(-1);
+
 
 
     free(temp);
+}
+
+void getOutlinks(Graph* g, float* result, size_t size, const long numberOfCores) {
+
+    // We want to create a thread pool with the tasks of finding the outlinks for each vertex
+    thr_pool_t* pool = thr_pool_create(numberOfCores, numberOfCores, 0, NULL);
+    if (!pool) exit(-1);
+    CountOutlinks* outlinkTasks = malloc(sizeof(CountOutlinks) * numberOfCores);
+    if (!outlinkTasks) exit(-1);
+
+
+    for (long i = 0; i < numberOfCores; i++) {
+        outlinkTasks[i].array = result;
+        outlinkTasks[i].index = i;
+        outlinkTasks[i].outlinks = g->adjacencyLists[i];
+
+    }
+
+    free(outlinkTasks);
 }
 
 
