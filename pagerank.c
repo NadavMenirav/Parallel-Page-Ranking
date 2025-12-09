@@ -25,14 +25,14 @@ typedef struct {
     size_t* outlinksCount; // The number of outlinks for every node in the graph
     size_t index; // Which node it calculates
     node* outlinks; // The adjacency list
-    size_t N; // The size of the graph
+    const Graph* graph; // The graph
 } CalculatePageRank;
 
 // result will be returned to rank array
 void PageRank(const Graph *g, int n, float* rank);
 
 // The function initializes the array in a parallel manner
-void initArray(float* array, size_t size, long numberOfCores);
+void initArray(float* array, size_t size, long numberOfCores, float value);
 
 // The function each thread will receive in order to initialize the chunk he has
 void* threadInitArray(void* arg);
@@ -62,7 +62,7 @@ void PageRank(const Graph *g, const int n, float* rank) {
      * We start by assigning 1/N as the rank for each vertex
      * (We will use n iterations that will improve this first assignment)
      */
-    initArray(rank, N, numberOfCores);
+    initArray(rank, N, numberOfCores, 1.f / (float)N);
 
     // We want to create an array that for each vertex store the number of OutLinks he has
     size_t* outlinks = malloc(N * sizeof(size_t));
@@ -86,7 +86,7 @@ void PageRank(const Graph *g, const int n, float* rank) {
     free(outlinks);
 }
 
-void initArray(float* array, const size_t size, const long numberOfCores) {
+void initArray(float* array, const size_t size, const long numberOfCores, const float value) {
 
     // We want to create a thread for each core we have, each thread will be given a different part of the array
     pthread_t* threads = malloc(sizeof(pthread_t) * numberOfCores);
@@ -101,7 +101,7 @@ void initArray(float* array, const size_t size, const long numberOfCores) {
         tasks[i].array = array;
         tasks[i].start = i * chunk;
         tasks[i].end = (i == numberOfCores - 1)? size: (i + 1) * chunk;
-        tasks[i].value = 1.f / (float)size; // The initial value required for the array
+        tasks[i].value = value; // The initial value required for the array
         pthread_create(&threads[i], NULL, &threadInitArray, &tasks[i]);
     }
 
@@ -134,8 +134,11 @@ void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, c
     // This array will be used to calculate the new values before storing them in the array
     float* temp = malloc(sizeof(float) * size);
     if (!temp) exit(-1);
-    CalculatePageRank* pageRank = malloc(sizeof(CalculatePageRank) * numberOfCores);
+    CalculatePageRank* pageRank = malloc(sizeof(CalculatePageRank) * size);
     if (!pageRank) exit(-1);
+
+    // We want to zero temp
+    initArray(temp, size, numberOfCores, 0);
 
     // We want to enqueue the tasks. We have 'size' nodes in the graph, and we want to create a task for each one
     for (size_t i = 0; i < size; i++) {
@@ -144,7 +147,7 @@ void improve(const Graph* g, thr_pool_t* pool, float* array, size_t* outlinks, c
         pageRank[i].index = i;
         pageRank[i].outlinksCount = outlinks;
         pageRank[i].outlinks = g->adjacencyLists[i];
-        pageRank[i].N = g->numVertices;
+        pageRank[i].graph = g;
     }
 
 
@@ -199,13 +202,33 @@ void* threadCalculatePageRank(void* arg) {
     CalculatePageRank* task = arg;
     if (!task) exit(-1);
 
-    float result = (1 - D) / (float)task->N;
+    task->temp[task->index] += (1 - D) / (float)task->graph->numVertices;
 
-    // For each of the neighbors u_i of v, we want to add to the result d * (pagerank(u_i)) / outlink(u_i)
-    const node* p = task->outlinks;
-
+    // We know that for every neighbor of v, we need to add to their pagerank value the fact that v points to them
+    node* p = task->outlinks; // We want to iterate over all the vertices v points to
     while (p) {
-        result += D * (task->array[p->v]) / (float)(task->outlinksCount[p->v]); // Double check this line
+        const vertex neighbour = p->v;
+
+        /*
+         * We want to add to the neighbors of v the value needed to add in the pagerank formula.
+         * That creates a race condition, where multiple threads working on vertices that points to the same vertex
+         * Will try to update the rank of the vertex all at once.
+         * In order to fix that problem we use mutexes. That way, we can assure only one thread accesses the value
+         * at any time.
+         */
+        pthread_mutex_lock(&task->graph->num_visits_mutexes[neighbour]); // Trying to capture the mutex
+
+        /*
+         * Using the formula for computing the PageRank (see README), each vertex needs to add to the vertices it
+         * points to d * pagerank(v) / outlink(v)
+         */
+        task->temp[neighbour] += D * task->array[task->index] / (float)task->outlinksCount[task->index];
+
+        // Releasing the mutex
+        pthread_mutex_unlock(&task->graph->num_visits_mutexes[neighbour]);
+
+        // Moving to the next neighbour
+        p = p->next;
     }
 
     return NULL;
