@@ -1,4 +1,4 @@
-thr_pool.c linguistic-vendored
-thr_pool.h linguistic-vendored
-graph.c linguistic-vendored
-graph.h linguistic-vendored
+thr_pool.c linguist-vendored
+thr_pool.h linguist-vendored
+graph.c linguist-vendored
+graph.h linguist-vendored
